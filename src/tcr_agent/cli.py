@@ -17,12 +17,15 @@ def main() -> int:
     parser.add_argument("--run-id", help="Run id. Defaults to a timestamped id.")
     parser.add_argument("--ai-review", action="store_true", help="Enable LLM code review.")
     parser.add_argument("--no-report-llm", action="store_true", help="Disable LLM report enhancement.")
+    parser.add_argument("--auto-fix", action="store_true", help="Apply supported fixes and verify them in the temporary workspace.")
     parser.add_argument("--test-command", help="Override test command, for example: 'python -m unittest discover -v'.")
     parser.add_argument("--direct", action="store_true", help="Run TestAgent directly without LangGraph.")
     args = parser.parse_args()
 
     try:
         data = load_project_input(args)
+        if args.auto_fix:
+            data.setdefault("config", {})["auto_fix"] = True
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
@@ -68,7 +71,7 @@ def build_project_from_paths(args: argparse.Namespace) -> dict:
         "test_timeout_seconds": 30,
         "ai_code_review_enabled": bool(args.ai_review),
         "report_use_llm": not args.no_report_llm,
-        "auto_fix": False,
+        "auto_fix": bool(getattr(args, "auto_fix", False)),
         "max_fix_rounds": 2,
     }
     if args.test_command:

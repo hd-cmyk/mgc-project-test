@@ -1,0 +1,23 @@
+{
+  "run_id": "demo_python_bug_auto_fix_001",
+  "language": "python",
+  "files": [
+    {
+      "path": "main.py",
+      "language": "python",
+      "content": "def add(a, b):\n    return a - b\n"
+    },
+    {
+      "path": "test_main.py",
+      "language": "python",
+      "content": "import unittest\nfrom main import add\n\n\nclass TestAdd(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(add(1, 2), 3)\n\n\nif __name__ == '__main__':\n    unittest.main()\n"
+    }
+  ],
+  "config": {
+    "lint_tools": ["py_compile"],
+    "test_timeout_seconds": 30,
+    "auto_fix": true,
+    "max_fix_rounds": 1,
+    "report_use_llm": false
+  }
+}

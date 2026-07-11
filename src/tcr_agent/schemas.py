@@ -229,6 +229,39 @@ class ReportAgentResult:
 
 
 @dataclass(slots=True)
+class FixAgentResult:
+    agent: Literal["FixAgent"]
+    status: Status
+    fixed_issue_ids: list[str] = field(default_factory=list)
+    modified_files: list[str] = field(default_factory=list)
+    patches: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["status"] = self.status.value
+        return data
+
+
+@dataclass(slots=True)
+class VerifyAgentResult:
+    agent: Literal["VerifyAgent"]
+    status: Status
+    test_results: list[TestSummary]
+    compliance_results: list[ComplianceResult]
+    passed: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "agent": self.agent,
+            "status": self.status.value,
+            "test_results": [item.to_dict() for item in self.test_results],
+            "compliance_results": [item.to_dict() for item in self.compliance_results],
+            "passed": self.passed,
+        }
+
+
+@dataclass(slots=True)
 class LLMMessage:
     role: Literal["system", "user", "assistant", "tool"]
     content: str

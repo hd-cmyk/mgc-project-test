@@ -135,7 +135,7 @@ def parse_test_output(result: CommandResult, command: list[str]) -> TestSummary:
     status = Status.PASSED if result.status == Status.PASSED else Status.FAILED
     passed, failed = parse_counts(output)
     total = passed + failed
-    failures = [] if status == Status.PASSED else [make_failure(output)]
+    failures = [] if status == Status.PASSED else parse_failures(output, tool)
     if total == 0:
         total = 1 if tool == "py_compile" else len(failures)
         failed = 0 if status == Status.PASSED else max(1, len(failures))
@@ -167,6 +167,73 @@ def parse_counts(output: str) -> tuple[int, int]:
     if ok_match and "OK" in output:
         passed = int(ok_match.group(1))
     return passed, failed
+
+
+def parse_failures(output: str, tool: str) -> list[TestFailure]:
+    if tool == "pytest":
+        failures = parse_pytest_failures(output)
+    elif tool == "unittest":
+        failures = parse_unittest_failures(output)
+    else:
+        failures = []
+    return failures or [make_failure(output)]
+
+
+def parse_pytest_failures(output: str) -> list[TestFailure]:
+    failures: list[TestFailure] = []
+    summaries = re.findall(r"^FAILED\s+(.+?)\s+-\s+(.+)$", output, re.MULTILINE)
+    for test_id, message in summaries:
+        file = test_id.split("::", 1)[0]
+        traceback = extract_pytest_section(output, test_id)
+        line = find_pytest_line(traceback, file) or find_pytest_line(output, file)
+        failures.append(
+            TestFailure(
+                test_id=test_id.strip(),
+                file=file,
+                line=line,
+                message=message.strip(),
+                traceback=truncate(traceback),
+            )
+        )
+    return failures
+
+
+def find_pytest_line(output: str, file: str) -> int | None:
+    matches = re.findall(rf"^{re.escape(file)}:(\d+):", output, re.MULTILINE)
+    return int(matches[-1]) if matches else None
+
+
+def extract_pytest_section(output: str, test_id: str) -> str:
+    test_name = test_id.split("::")[-1]
+    match = re.search(
+        rf"_+\s+{re.escape(test_name)}\s+_+\n(.*?)(?=\n_+\s+|\n=+\s+short test summary info)",
+        output,
+        re.DOTALL,
+    )
+    return match.group(1).strip() if match else output
+
+
+def parse_unittest_failures(output: str) -> list[TestFailure]:
+    failures: list[TestFailure] = []
+    pattern = re.compile(
+        r"^={10,}\n(?:FAIL|ERROR):\s+([^\n]+)\n-{10,}\n(.*?)(?=^={10,}|^Ran\s+\d+\s+tests?)",
+        re.MULTILINE | re.DOTALL,
+    )
+    for header, traceback in pattern.findall(output):
+        test_id_match = re.search(r"\(([^)]+)\)", header)
+        locations = re.findall(r'File "([^"]+\.py)", line (\d+)', traceback)
+        file, line = (locations[-1][0], int(locations[-1][1])) if locations else ("", None)
+        message_match = re.findall(r"^(?:AssertionError|[A-Za-z]+Error):.*$", traceback, re.MULTILINE)
+        failures.append(
+            TestFailure(
+                test_id=(test_id_match.group(1) if test_id_match else header).strip(),
+                file=Path(file).name if file else "",
+                line=line,
+                message=message_match[-1].strip() if message_match else header.strip(),
+                traceback=truncate(traceback.strip()),
+            )
+        )
+    return failures
 
 
 def make_failure(output: str) -> TestFailure:

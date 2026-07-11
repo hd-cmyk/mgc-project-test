@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from .agents.fix_agent import run_fix_agent
@@ -28,7 +29,10 @@ def build_graph():
     return graph.compile()
 
 
-def run_graph(project: ProjectInput | dict[str, Any]) -> GraphState:
+def run_graph(
+    project: ProjectInput | dict[str, Any],
+    on_node_complete: Callable[[str, GraphState], None] | None = None,
+) -> GraphState:
     project_input = project if isinstance(project, ProjectInput) else ProjectInput.from_dict(project)
     app = build_graph()
     initial_state: GraphState = {
@@ -36,7 +40,15 @@ def run_graph(project: ProjectInput | dict[str, Any]) -> GraphState:
         "project": project_input.to_dict(),
         "errors": [],
     }
-    return app.invoke(initial_state)
+    if on_node_complete is None:
+        return app.invoke(initial_state)
+
+    state = initial_state
+    for update in app.stream(initial_state, stream_mode="updates"):
+        for node_name, node_state in update.items():
+            state = {**state, **node_state}
+            on_node_complete(node_name, state)
+    return state
 
 
 def run_direct(project: ProjectInput | dict[str, Any]) -> GraphState:

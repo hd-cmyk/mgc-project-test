@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "A LangGraph-based test-compliance-fix agent prototype."
 requires-python = ">=3.11"
 dependencies = [
+  "fastapi>=0.115",
   "langgraph>=0.2",
+  "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -23,4 +25,4 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-tcr_agent = ["templates/*.md"]
+tcr_agent = ["templates/*.md", "web/static/*"]

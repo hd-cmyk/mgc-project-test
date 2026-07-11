@@ -1,17 +1,54 @@
 # TCR Agent Prototype
 
-TCR Agent 是一个“测试-合规-纠正”智能体原型。目前已完成第一阶段闭环前半段：
+TCR Agent 是一个具备“规划—执行—自愈”闭环的自动化测试智能体，并提供适合课程答辩和现场演示的 Web 控制台。
 
 ```text
 代码输入
+  -> ExecutionPlanner: 生成真实执行计划
   -> TestAgent: 运行测试、语法/合规检查、可选 AI 代码审查
-  -> ReportAgent: 汇总测试/合规/AI 审查结果并生成结构化报告
+  -> ReportAgent: 汇总问题并判断是否需要修复
+  -> FixAgent: 在临时 workspace 执行确定性修复
+  -> VerifyAgent: 回归测试并验证修复
 ```
 
 当前 LangGraph 流程：
 
 ```text
-START -> TestAgent -> ReportAgent -> END
+START -> TestAgent -> ReportAgent -> maybe FixAgent -> maybe VerifyAgent -> END
+```
+
+## Web GUI
+
+启动专业演示控制台：
+
+```bash
+.venv/bin/python web.py
+```
+
+`web.py` 会优先启动 FastAPI + uvicorn；如果当前离线环境尚未安装这两个依赖，会自动使用具备相同 API 的 Python 标准库服务器，保证 Demo 仍可运行。代码编辑器资源使用 CodeMirror CDN，现场演示前建议确认浏览器可访问 CDN 或提前缓存资源。
+
+浏览器访问：
+
+```text
+http://127.0.0.1:8000
+```
+
+控制台提供：
+
+- CodeMirror Python 工作区，支持增删、改名、上传和问题行跳转。
+- AI 审查、LLM 报告增强、Auto Fix、超时和测试命令配置。
+- 由真实 `ExecutionPlanner` 和 LangGraph 节点更新驱动的任务进度。
+- 结构化问题清单、测试/合规日志、修复 patch 与回归验证结果。
+- 内存任务记录与轮询接口，不需要数据库。
+
+主要接口：
+
+```text
+GET  /api/health
+GET  /api/example
+POST /api/plan
+POST /api/runs
+GET  /api/runs/{task_id}
 ```
 
 ## 已实现功能
@@ -42,7 +79,7 @@ START -> TestAgent -> ReportAgent -> END
 ```text
 .
   run.py                              根目录启动入口
-  requirements.txt                    运行依赖
+  pyproject.toml                      运行依赖与项目配置
   .env.example                        LLM 网关配置模板
   examples/python_bug/
     main.py                           示例源码，故意包含 bug
@@ -71,7 +108,6 @@ cd "/Users/jianghj59/Documents/mgc project"
 python3.12 -m venv .venv
 source .venv/bin/activate
 
-pip install -r requirements.txt
 pip install -e ".[dev]"
 ```
 
@@ -256,6 +292,6 @@ test_result.compliance_results 中 tool = "llm_review" 的对象
 ## 当前限制
 
 - 目前主要支持 Python 文件。
-- 当前只完成 `TestAgent -> ReportAgent`，还未实现 `FixAgent` 和 `VerifyAgent`。
+- 当前 FixAgent 使用面向课程 Demo 的确定性修复规则，修改仅发生在临时 workspace。
 - AI 审查默认关闭，必须通过 `--ai-review` 或 JSON 配置显式开启。
 - `ruff`、`semgrep` 目前仅预留为合规工具扩展点，MVP 中未完整实现。

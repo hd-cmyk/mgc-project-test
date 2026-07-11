@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TCR 自动化测试智能体</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark"><span>T</span></div>
+          <div>
+            <div class="brand-title">TCR 自动化测试智能体</div>
+            <div class="brand-subtitle">Planning · Execution · Self-Healing</div>
+          </div>
+        </div>
+        <div class="top-actions">
+          <div class="service-pill"><span id="serviceDot" class="dot"></span><span id="serviceText">连接中</span></div>
+          <div class="service-pill"><span class="dot neutral"></span>LLM <span id="llmText">检测中</span></div>
+          <button id="loadExampleBtn" class="button secondary">加载示例</button>
+          <button id="exportBtn" class="button secondary" disabled>↓ 导出修改文件</button>
+          <button id="runBtn" class="button primary"><span>▶</span> 开始运行</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero-strip">
+          <div>
+            <div class="eyebrow">AUTONOMOUS TESTING WORKBENCH</div>
+            <h1>从缺陷发现到自愈验证，<span>一次运行完成闭环</span></h1>
+            <p>面向 Python 项目的测试规划、自动执行、故障诊断、自主修复与回归验证平台。</p>
+          </div>
+          <div class="hero-metric"><strong id="heroStatus">准备就绪</strong><span id="heroHint">加载示例并启动一次真实任务</span></div>
+        </section>
+
+        <section class="workspace-grid">
+          <div class="panel editor-panel">
+            <div class="panel-header">
+              <div><span class="panel-index">01</span><h2>代码工作区</h2></div>
+              <div class="inline-actions">
+                <label class="icon-button" title="上传 Python 文件">↑<input id="fileUpload" type="file" accept=".py" multiple hidden /></label>
+                <button id="addFileBtn" class="icon-button" title="新增文件">＋</button>
+                <button id="renameFileBtn" class="icon-button" title="重命名">✎</button>
+                <button id="deleteFileBtn" class="icon-button danger" title="删除文件">×</button>
+              </div>
+            </div>
+            <div class="editor-layout">
+              <aside class="file-sidebar">
+                <div class="sidebar-label">PROJECT FILES</div>
+                <div id="fileList" class="file-list"></div>
+              </aside>
+              <div class="editor-stage">
+                <div class="editor-tab"><span class="python-icon">Py</span><span id="activeFileName">main.py</span><span id="cursorPosition">Ln 1, Col 1</span></div>
+                <textarea id="codeEditor"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <aside class="panel config-panel">
+            <div class="panel-header"><div><span class="panel-index">02</span><h2>运行配置</h2></div></div>
+            <div class="config-body">
+              <label class="switch-row"><span><strong>AI Code Review</strong><small id="aiHint">智能代码审查</small></span><input id="aiReview" type="checkbox" /><i></i></label>
+              <label class="switch-row"><span><strong>Report LLM Enhancement</strong><small>增强根因分析与建议</small></span><input id="reportLlm" type="checkbox" /><i></i></label>
+              <label class="switch-row accent"><span><strong>Auto Fix / 自愈修复</strong><small>允许 Agent 修改临时副本</small></span><input id="autoFix" type="checkbox" checked /><i></i></label>
+              <div class="field-grid">
+                <label>最大修复轮数<input id="maxRounds" type="number" min="1" max="5" value="2" /></label>
+                <label>测试超时（秒）<input id="timeout" type="number" min="5" max="300" value="30" /></label>
+              </div>
+              <label class="field">自定义测试命令<input id="testCommand" placeholder="留空则自动检测 pytest / unittest" /></label>
+              <div class="safety-note"><strong>安全边界</strong><span>所有代码修改仅发生在隔离临时 workspace，不覆盖原始文件。</span></div>
+            </div>
+          </aside>
+        </section>
+
+        <section class="panel flow-panel">
+          <div class="panel-header">
+            <div><span class="panel-index">03</span><h2>Agent 自愈闭环</h2></div>
+            <div id="runId" class="run-id">NO ACTIVE RUN</div>
+          </div>
+          <div id="flowNodes" class="flow-nodes"></div>
+          <div id="planDetails" class="plan-details empty">运行后将在此展示 ExecutionPlanner 生成的真实执行计划。</div>
+        </section>
+
+        <section id="resultsSection" class="results hidden">
+          <div class="section-heading"><div><span class="eyebrow">RUN INSIGHTS</span><h2>执行结果</h2></div><div id="durationBadge" class="duration-badge">0 ms</div></div>
+          <div id="summaryCards" class="summary-grid"></div>
+
+          <div class="result-grid">
+            <section class="panel issues-panel">
+              <div class="panel-header"><div><span class="panel-index">04</span><h2>问题清单</h2></div><span id="issueCount" class="count-badge">0</span></div>
+              <div class="filter-bar">
+                <select id="severityFilter"><option value="all">全部严重程度</option></select>
+                <select id="sourceFilter"><option value="all">全部来源</option></select>
+              </div>
+              <div id="issueList" class="issue-list"></div>
+            </section>
+
+            <section class="panel tests-panel">
+              <div class="panel-header"><div><span class="panel-index">05</span><h2>测试与合规</h2></div></div>
+              <div id="testResults" class="test-results"></div>
+            </section>
+          </div>
+
+          <section class="panel healing-panel">
+            <div class="panel-header"><div><span class="panel-index">06</span><h2>自愈修复与回归验证</h2></div><span id="healingStatus" class="status-badge">未执行</span></div>
+            <div id="healingResults" class="healing-results"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <div id="toast" class="toast"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+    <script src="/static/app.js?v=20260712-export-fix"></script>
+  </body>
+</html>
